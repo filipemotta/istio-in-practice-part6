@@ -1,0 +1,95 @@
+# GKE side of the payments namespace: the caller (payments-api) and one
+# fraud-check. The same namespace and Service exist on EKS, so with namespace
+# sameness the mesh sees one fraud-check service with endpoints in two clouds.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: payments
+  labels:
+    istio-injection: enabled
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: payments-api
+  namespace: payments
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fraud-check
+  namespace: payments
+---
+# payments-api is the caller: curl stands in for the service code.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payments-api
+  namespace: payments
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payments-api
+  template:
+    metadata:
+      labels:
+        app: payments-api
+        version: v1
+    spec:
+      serviceAccountName: payments-api
+      containers:
+      - name: app
+        image: curlimages/curl:8.22.0
+        command: ["sleep", "infinity"]
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fraud-check
+  namespace: payments
+  labels:
+    app: fraud-check
+spec:
+  selector:
+    app: fraud-check
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+---
+# fraud-check: fortio's echo server. Every answer carries x-served-by, so the
+# caller can count which cloud served each request. The failover step adds
+# status=503 to the same default parameters.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fraud-check
+  namespace: payments
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fraud-check
+  template:
+    metadata:
+      labels:
+        app: fraud-check
+        version: v1
+    spec:
+      serviceAccountName: fraud-check
+      containers:
+      - name: app
+        image: fortio/fortio:1.75.3
+        args: ["server", "-http-port", "8080", "-grpc-port", "disabled", "-redirect-port", "disabled", "-tcp-port", "disabled", "-udp-port", "disabled",
+               "-echo-server-default-params", "header=x-served-by:gke-us-east4"]
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi

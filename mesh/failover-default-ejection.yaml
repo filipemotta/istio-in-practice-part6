@@ -1,0 +1,22 @@
+# The second pitfall: the failover rule with outlier detection and the default
+# maxEjectionPercent (10%). Calls stay local, as intended, but when the local
+# pod fails it is never ejected: ejecting one host out of three is 33%, above
+# the limit, so the caller keeps getting the local 503s.
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: fraud-check
+  namespace: payments
+spec:
+  host: fraud-check.payments.svc.cluster.local
+  trafficPolicy:
+    loadBalancer:
+      localityLbSetting:
+        enabled: true
+        failover:
+        - from: us-east4
+          to: us-east-1
+    outlierDetection:
+      consecutive5xxErrors: 1
+      interval: 1s
+      baseEjectionTime: 1m

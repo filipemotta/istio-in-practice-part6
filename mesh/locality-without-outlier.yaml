@@ -1,0 +1,18 @@
+# The pitfall: locality failover written without outlier detection. Istio
+# enables locality load balancing only when the DestinationRule has
+# outlierDetection, so this rule changes nothing and traffic keeps going to
+# both clouds.
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: fraud-check
+  namespace: payments
+spec:
+  host: fraud-check.payments.svc.cluster.local
+  trafficPolicy:
+    loadBalancer:
+      localityLbSetting:
+        enabled: true
+        failover:
+        - from: us-east4
+          to: us-east-1

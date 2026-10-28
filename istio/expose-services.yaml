@@ -1,0 +1,20 @@
+# samples/multicluster/expose-services.yaml of Istio 1.31.3, unchanged. The
+# east-west gateway forwards on SNI (AUTO_PASSTHROUGH) to any *.local service:
+# the mTLS session goes from the caller's sidecar to the callee's sidecar, and
+# the gateway never terminates it.
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: cross-network-gateway
+spec:
+  selector:
+    istio: eastwestgateway
+  servers:
+    - port:
+        number: 15443
+        name: tls
+        protocol: TLS
+      tls:
+        mode: AUTO_PASSTHROUGH
+      hosts:
+        - "*.local"

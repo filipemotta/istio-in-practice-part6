@@ -1,0 +1,25 @@
+# Keep fraud-check calls in the caller's region and fail over to the other
+# cloud only when the local endpoints are ejected. outlierDetection is what
+# turns locality load balancing on, and what ejects a failing endpoint.
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: fraud-check
+  namespace: payments
+spec:
+  host: fraud-check.payments.svc.cluster.local
+  trafficPolicy:
+    loadBalancer:
+      localityLbSetting:
+        enabled: true
+        failover:
+        - from: us-east4
+          to: us-east-1
+    outlierDetection:
+      consecutive5xxErrors: 1
+      interval: 1s
+      baseEjectionTime: 1m
+      # The default is 10% of the pool. With one fraud-check per cloud the pool
+      # has three hosts (the local pod and two gateway addresses), and ejecting
+      # one of them is 33%, so the default never ejects anything.
+      maxEjectionPercent: 100

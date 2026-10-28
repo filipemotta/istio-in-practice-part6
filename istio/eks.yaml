@@ -1,0 +1,24 @@
+# istiod for the EKS cluster. The three values every primary must agree on
+# with the other one: the mesh (meshID), its own name in that mesh
+# (clusterName) and the network its pod IPs are reachable on (network).
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+spec:
+  profile: default
+  components:
+    # The ingress gateway of the default profile is not used by this lab.
+    ingressGateways:
+    - name: istio-ingressgateway
+      enabled: false
+    pilot:
+      k8s:
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+  values:
+    global:
+      meshID: mesh-payments
+      multiCluster:
+        clusterName: eks-us-east-1
+      network: network-aws

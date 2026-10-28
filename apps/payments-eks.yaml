@@ -1,0 +1,62 @@
+# EKS side of the payments namespace: the second fraud-check, run by another
+# team in another cloud. Same namespace, same Service name: with namespace
+# sameness that is all it takes for the mesh to treat it as the same service.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: payments
+  labels:
+    istio-injection: enabled
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fraud-check
+  namespace: payments
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fraud-check
+  namespace: payments
+  labels:
+    app: fraud-check
+spec:
+  selector:
+    app: fraud-check
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+---
+# fraud-check: fortio's echo server. Every answer carries x-served-by, so the
+# caller can count which cloud served each request. The failover step adds
+# status=503 to the same default parameters.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fraud-check
+  namespace: payments
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fraud-check
+  template:
+    metadata:
+      labels:
+        app: fraud-check
+        version: v1
+    spec:
+      serviceAccountName: fraud-check
+      containers:
+      - name: app
+        image: fortio/fortio:1.75.3
+        args: ["server", "-http-port", "8080", "-grpc-port", "disabled", "-redirect-port", "disabled", "-tcp-port", "disabled", "-udp-port", "disabled",
+               "-echo-server-default-params", "header=x-served-by:eks-us-east-1"]
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi

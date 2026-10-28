@@ -1,0 +1,54 @@
+# validate.sh on every push and pull request: terraform fmt + validate for the
+# six stacks, kubeconform for the manifests, shellcheck for the scripts.
+# The lab itself creates billable resources in two clouds, so it is not run
+# here: there are no cloud credentials in this repository or its CI. Run it
+# yourself with scripts/test-all.sh (README.md, "Run the lab").
+name: validate
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      TERRAFORM_VERSION: "1.17.0"
+      KUBECONFORM_VERSION: v0.8.0
+    steps:
+      # actions/checkout v7.0.1, pinned to the commit SHA of the tag
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: terraform and kubeconform (checksums verified)
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/bin"
+          cd "${RUNNER_TEMP}"
+          base="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}"
+          zip="terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+          curl -sSfLO "${base}/${zip}"
+          curl -sSfLO "${base}/terraform_${TERRAFORM_VERSION}_SHA256SUMS"
+          grep " ${zip}$" "terraform_${TERRAFORM_VERSION}_SHA256SUMS" | sha256sum -c -
+          unzip -q "${zip}" terraform -d "${RUNNER_TEMP}/bin"
+          base="https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}"
+          curl -sSfLO "${base}/kubeconform-linux-amd64.tar.gz"
+          curl -sSfLO "${base}/CHECKSUMS"
+          grep ' kubeconform-linux-amd64.tar.gz$' CHECKSUMS | sha256sum -c -
+          tar -xzf kubeconform-linux-amd64.tar.gz -C "${RUNNER_TEMP}/bin" kubeconform
+          echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
+      - name: validate.sh
+        run: |
+          set -euo pipefail
+          terraform version | head -1
+          shellcheck --version | head -2
+          kubeconform -v
+          out="$(bash validate.sh 2>&1)" || { echo "${out}"; exit 1; }
+          echo "${out}"
+          # A missing validator is a failure in CI, not a skip.
+          if grep -q '\[skipped\]' <<<"${out}"; then echo "validate.sh skipped a check"; exit 1; fi
