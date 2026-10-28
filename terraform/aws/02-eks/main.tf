@@ -3,7 +3,7 @@
 # the two IAM roles and an explicit admin access entry. Network comes from 01.
 
 terraform {
-  required_version = ">= 1.10.0"
+  required_version = ">= 1.11.0"
 
   required_providers {
     aws = {

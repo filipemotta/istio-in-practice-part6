@@ -1,7 +1,7 @@
 # Stack 00-remote-backend: the S3 bucket that holds the state of 01 and 02.
 
 terraform {
-  required_version = ">= 1.10.0"
+  required_version = ">= 1.11.0"
 
   required_providers {
     aws = {

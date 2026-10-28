@@ -53,7 +53,7 @@ spreads traffic across the clouds until you tell it otherwise.
 - Istio 1.31.3 (istioctl downloaded into `./bin` with its SHA-256 checked)
 - kubectl v1.37.1 (same)
 - Kubernetes 1.36 on both clusters (EKS `1.36`, GKE release channel REGULAR)
-- Terraform >= 1.10, providers `hashicorp/aws ~> 6.70`, `hashicorp/google ~> 8.9`
+- Terraform >= 1.11 (S3 native state locking), providers `hashicorp/aws ~> 6.70`, `hashicorp/google ~> 8.9`
 - fortio 1.75.3, curl 8.22.0 (lab workloads)
 
 ## Prerequisites
@@ -92,7 +92,7 @@ whatever your gcloud default project is.
 | `03-discovery.sh` | apps, remote secrets both ways | both remote clusters `synced`; what the remote secret grants; the EKS fraud-check appears in the GKE caller's proxy as the EKS gateway on 15443; with different roots every call to EKS fails, and the caller's proxy says why |
 | `04-trust.sh` | reissue the EKS intermediate from the GKE team's root, restart istiod and the EKS proxies | one root on both sides; the same calls now succeed |
 | `05-locality.sh` | 200 calls with no rule, with a failover rule without outlier detection, with the full rule | traffic crosses clouds by default; the rule without outlier detection is accepted with a warning and changes nothing that matters; the full rule keeps 200 of 200 local |
-| `06-failover.sh` | the GKE fraud-check answers 503 | with the default `maxEjectionPercent` nothing moves; with 100% the calls move to EKS; after the ejection time they come back |
+| `06-failover.sh` | the GKE fraud-check answers 503 | with the default `maxEjectionPercent` nothing moves; with 100% the calls move to EKS; once the repaired pod is Ready they come back |
 | `07-exposure.sh` | probes the east-west gateways from this machine and from GKE | outsiders get no answer; the peer NAT address connects and is still refused without mesh mTLS |
 
 Pass `KEEP=1` and run any step again on its own (`bash scripts/05-locality.sh`), except
@@ -102,7 +102,7 @@ Pass `KEEP=1` and run any step again on its own (`bash scripts/05-locality.sh`),
 
 Clean run from empty accounts, 2026-10-28: Terraform apply, the seven steps, then the
 teardown. 58 of 58 assertions passed in 1724 s (Terraform alone 1061 s), and the teardown
-found 11 of 11 clouds clean; 2724 s wall time in total.
+found the clouds clean in 11 of 11 checks; 2724 s wall time in total.
 
 - **Discovery**: right after both remote clusters reported `synced`, the caller's proxy
   listed the EKS fraud-check by its **pod IP** (`10.10.11.90:8080`), unreachable from GKE.
@@ -111,7 +111,7 @@ found 11 of 11 clouds clean; 2724 s wall time in total.
   network has no known gateway (`EndpointsByNetworkFilter`, `ep_filters.go`), which is why
   `03-discovery.sh` waits for the gateway before measuring anything.
 - **Different roots**: 0 of 10 calls to EKS succeeded (8 × 503 from the caller's own proxy,
-  2 timeouts while the NLB warmed up). The proxy's connection log says why:
+  2 timeouts, most likely right after the local pod went away). The proxy's connection log says why:
   `CERTIFICATE_VERIFY_FAILED ... self signed certificate in certificate chain`.
 - **One root**: 20 of 20 calls served by EKS, median 9 ms GKE → EKS.
 - **No rule**: 100 calls served by GKE, 100 by EKS (medians 4 ms and 8 ms). Earlier runs
@@ -123,7 +123,9 @@ found 11 of 11 clouds clean; 2724 s wall time in total.
 - **Broken local fraud-check, default `maxEjectionPercent` (10%)**: 50 of 50 calls got the
   local 503, the endpoint was never ejected.
 - **Same failure, `maxEjectionPercent: 100`**: 199 calls served by EKS, one 503 before the
-  ejection; after repairing and waiting out `baseEjectionTime`, 200 of 200 back in us-east4.
+  ejection. The repair is a rollout, so the repaired pod is a new endpoint and 200 of 200
+  calls were back in us-east4 once it was Ready (the lab does not show an ejected host
+  returning after `baseEjectionTime`).
 - **Exposure**: neither gateway answers this machine; the GKE NAT address reaches the EKS
   gateway, which still refuses a client without mesh mTLS.
 

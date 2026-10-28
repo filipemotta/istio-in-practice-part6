@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Step 6: failover across clouds. The GKE fraud-check starts answering 503.
 # With the default maxEjectionPercent nothing moves; with 100%, outlier
-# detection ejects the local pod and the calls move to EKS. When it recovers,
-# the calls come back after the ejection time.
+# detection ejects the local pod and the calls move to EKS. The repair is a
+# rollout, so the repaired pod is a new endpoint and the calls come back to it.
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 assert_lab_context
@@ -37,10 +37,10 @@ expect_ge "the calls fail over to EKS" $((N - 5)) "${eks_n}"
 expect_ge "calls without a 503 (at most 5 failed before the ejection)" "$((N - 5))" "$((N - errs))"
 expect_eq "the local endpoint is marked as failed by outlier detection" "true" "$(local_failed)"
 
-step "repair it and wait out the ejection (baseEjectionTime 1m)"
+step "repair it (a rollout: the repaired pod is a new, un-ejected endpoint)"
 k gke -n payments patch deploy fraud-check --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/args\",\"value\":${ARGS_OK}}]" >/dev/null
 k gke -n payments rollout status deploy/fraud-check --timeout=5m >/dev/null
-sleep 70
+sleep 70 # let the old endpoint leave EDS in the caller's proxy
 fraud_calls "${N}" > "${OUT}/calls-06-back.txt"
 gke_n="$(count_served "${OUT}/calls-06-back.txt" gke-us-east4)"
 note "served by GKE: ${gke_n}"

@@ -2,7 +2,7 @@
 # and the project APIs the downstream stacks call.
 
 terraform {
-  required_version = ">= 1.10.0"
+  required_version = ">= 1.11.0"
 
   required_providers {
     google = {

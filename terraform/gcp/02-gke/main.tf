@@ -4,7 +4,7 @@
 # and the firewall rule the Istio webhook needs. Network comes from 01.
 
 terraform {
-  required_version = ">= 1.10.0"
+  required_version = ">= 1.11.0"
 
   required_providers {
     google = {
