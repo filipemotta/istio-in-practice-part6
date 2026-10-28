@@ -1,6 +1,6 @@
 # istio-in-practice-part6
 
-Companion repository for *Istio, Hands-On, Part 6*: one Istio mesh across GKE and EKS,
+Companion repository for *Istio, Hands-On*, the final part: one Istio mesh across GKE and EKS,
 multi-primary on two networks, built with Terraform and tested end to end in both clouds.
 
 The lab proves the article's claim with assertions, not screenshots: a multi-cluster mesh is
