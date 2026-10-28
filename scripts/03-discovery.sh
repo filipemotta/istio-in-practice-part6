@@ -80,7 +80,7 @@ k gke -n payments scale deploy/fraud-check --replicas=0 >/dev/null
 k gke -n payments wait --for=delete pod -l app=fraud-check --timeout=2m >/dev/null 2>&1 || true
 sleep 10
 fraud_calls 10 > "${OUT}/calls-03-different-roots.txt"
-cat "${OUT}/calls-03-different-roots.txt" | sort | uniq -c | sed 's/^/      /'
+sort "${OUT}/calls-03-different-roots.txt" | uniq -c | sed 's/^/      /'
 # Most fail fast with 503; right after the local pod goes away an attempt can
 # still hang to the 5 s client timeout (000). None may succeed.
 expect_eq "no call to EKS succeeds while the roots differ" "0" "$(count_code "${OUT}/calls-03-different-roots.txt" 200)"

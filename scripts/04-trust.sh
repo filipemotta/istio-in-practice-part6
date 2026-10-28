@@ -31,7 +31,7 @@ eks_chain_root="$(ictl eks proxy-config secret deploy/fraud-check.payments -o js
   | jq -r '.dynamicActiveSecrets[] | select(.name == "ROOTCA") | .secret.validationContext.trustedCa.inlineBytes' | base64 -d | openssl x509 -noout -fingerprint -sha256)"
 expect_eq "the EKS fraud-check proxy trusts that root" "${gke_root}" "${eks_chain_root}"
 fraud_calls 20 > "${OUT}/calls-04-common-root.txt"
-cat "${OUT}/calls-04-common-root.txt" | awk '{ print $1, $2 }' | sort | uniq -c | sed 's/^/      /'
+awk '{ print $1, $2 }' "${OUT}/calls-04-common-root.txt" | sort | uniq -c | sed 's/^/      /'
 expect_eq "the same 20 calls now succeed, served by EKS" "20" "$(count_served "${OUT}/calls-04-common-root.txt" eks-us-east-1)"
 note "median latency GKE -> EKS: $(median_ms "${OUT}/calls-04-common-root.txt" eks-us-east-1) ms"
 
