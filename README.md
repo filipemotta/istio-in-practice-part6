@@ -1,4 +1,4 @@
-# istio-in-practice-part6
+# Istio, Hands-On, Final Part: GKE and EKS in One Mesh: How Your Calls Cross Clouds and When They Shouldn’t
 
 Companion repository for *Istio, Hands-On*, the final part: one Istio mesh across GKE and EKS,
 multi-primary on two networks, built with Terraform and tested end to end in both clouds.
